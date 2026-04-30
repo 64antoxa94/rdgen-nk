@@ -514,7 +514,13 @@ jobs:
       - name: Create MacOS directory structure
         run: |
           mkdir -p ./build/macos/Build/Products/Release/RustDesk.app/Contents/MacOS
-
+      - name: Fix libaom CMake checks for macOS Intel
+        run: |
+          echo "VCPKG_CMAKE_CONFIGURE_OPTIONS=-DAOM_TEST_NASM=OFF -DAOM_TEST_PIC=OFF" >> $GITHUB_ENV
+          echo "MACOSX_DEPLOYMENT_TARGET=12.0" >> $GITHUB_ENV
+          echo "CFLAGS=-fPIC -mmacosx-version-min=12.0" >> $GITHUB_ENV
+          echo "CXXFLAGS=-fPIC -mmacosx-version-min=12.0" >> $GITHUB_ENV
+        
       - name: Build rustdesk
         run: |
           if [ "${{ matrix.job.target }}" = "aarch64-apple-darwin" ]; then
