@@ -100,13 +100,13 @@ jobs:
               arch: x86_64,
               vcpkg-triplet: x64-osx,
             }
-          - {
-              target: aarch64-apple-darwin,
-              os: macos-15,  # ← Обновлено с macos-14 для стабильности
-              extra-build-args: "--screencapturekit",
-              arch: aarch64,
-              vcpkg-triplet: arm64-osx,
-          }
+          #- {
+          #    target: aarch64-apple-darwin,
+          #    os: macos-15,  # ← Обновлено с macos-14 для стабильности
+          #   extra-build-args: "--screencapturekit",
+          #    arch: aarch64,
+          #    vcpkg-triplet: arm64-osx,
+          #}
     env:
       STATUS_URL: ${{ fromJson(inputs.extras).rdgen == 'true' && format('{0}/updategh', secrets.GENURL) || format('{0}/api/updategh', inputs.apiServer) }}
 
@@ -525,6 +525,11 @@ jobs:
         
       - name: Build rustdesk
         run: |
+          MIN_MACOS_VERSION="12.0"
+          sed -i -e "s/MACOSX_DEPLOYMENT_TARGET\=[0-9]*.[0-9]*/MACOSX_DEPLOYMENT_TARGET=${MIN_MACOS_VERSION}/" build.py
+          sed -i -e "s/platform :osx, '.*'/platform :osx, '${MIN_MACOS_VERSION}'/" flutter/macos/Podfile
+          sed -i -e "s/osx_minimum_system_version = \"[0-9]*.[0-9]*\"/osx_minimum_system_version = \"${MIN_MACOS_VERSION}\"/" Cargo.toml
+        
           if [ "${{ matrix.job.target }}" = "aarch64-apple-darwin" ]; then
             MIN_MACOS_VERSION="12.3"
             sed -i -e "s/MACOSX_DEPLOYMENT_TARGET\=[0-9]*.[0-9]*/MACOSX_DEPLOYMENT_TARGET=${MIN_MACOS_VERSION}/" build.py
@@ -533,7 +538,7 @@ jobs:
             sed -i -e "s/MACOSX_DEPLOYMENT_TARGET = [0-9]*.[0-9]*;/MACOSX_DEPLOYMENT_TARGET = ${MIN_MACOS_VERSION};/" flutter/macos/Runner.xcodeproj/project.pbxproj
           fi
           sed -i -e "s/RustDesk.app/\"${{ inputs.appname }}.app\"/" build.py
-          ./build.py --flutter --hwcodec --unix-file-copy-paste ${{ matrix.job.extra-build-args }}
+          ./build.py --clean-build --flutter --hwcodec --unix-file-copy-paste ${{ matrix.job.extra-build-args }}
 
       # - name: Copy service file
       #   run: |
