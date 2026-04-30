@@ -486,7 +486,19 @@ jobs:
         with:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
           doNotCache: false
-          
+
+      - name: Upload libaom debug logs (macOS Intel)
+        if: ${{ failure() && matrix.job.arch == 'x86_64' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: libaom-debug-logs-x64
+          path: |
+            ${{ env.VCPKG_ROOT }}/buildtrees/aom/config-x64-osx-*.log
+            ${{ env.VCPKG_ROOT }}/buildtrees/aom/*.log
+            ${{ env.VCPKG_ROOT }}/buildtrees/aom/**/*.log
+          retention-days: 7
+          if-no-files-found: warn
+    
       - name: Fix libaom CMake checks for macOS Intel
         run: |
           echo "VCPKG_CMAKE_CONFIGURE_OPTIONS=-DAOM_TEST_NASM=OFF -DAOM_TEST_PIC=OFF" >> $GITHUB_ENV
@@ -498,7 +510,7 @@ jobs:
         run: |
           if ! $VCPKG_ROOT/vcpkg \
             install \
-            --x-install-root="$VCPKG_ROOT/installed"; then
+            --x-install-root="$VCPKG_ROOT/installed" --debug --keep-going; then
             find "${VCPKG_ROOT}/" -name "*.log" | while read -r _1; do
               echo "$_1:"
               echo "======"
