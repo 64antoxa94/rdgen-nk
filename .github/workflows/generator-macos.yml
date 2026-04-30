@@ -487,25 +487,41 @@ jobs:
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
           doNotCache: false
 
-      - name: Upload libaom debug logs (macOS Intel)
-        if: ${{ failure() && matrix.job.arch == 'x86_64' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: libaom-debug-logs-x64
-          path: |
-            ${{ env.VCPKG_ROOT }}/buildtrees/aom/config-x64-osx-*.log
-            ${{ env.VCPKG_ROOT }}/buildtrees/aom/*.log
-            ${{ env.VCPKG_ROOT }}/buildtrees/aom/**/*.log
-          retention-days: 7
-          if-no-files-found: warn
-    
-      - name: Fix libaom CMake checks for macOS Intel
-        run: |
-          echo "VCPKG_CMAKE_CONFIGURE_OPTIONS=-DAOM_TEST_NASM=OFF -DAOM_TEST_PIC=OFF" >> $GITHUB_ENV
-          echo "MACOSX_DEPLOYMENT_TARGET=12.0" >> $GITHUB_ENV
-          echo "CFLAGS=-fPIC -mmacosx-version-min=12.0" >> $GITHUB_ENV
-          echo "CXXFLAGS=-fPIC -mmacosx-version-min=12.0" >> $GITHUB_ENV
+      - name: Patch libaom portfile for macOS Intel
+        if: ${{ matrix.job.arch == 'x86_64' }}
+        run: | 
+          AOM_PORTFILE=$(find "${VCPKG_ROOT}/ports/aom" -name "portfile.cmake" 2>/dev/null | head -1)
+          if [ -n "$AOM_PORTFILE" ]; then
+            echo "🔧 Patching $AOM_PORTFILE"
+            sed -i '' 's/vcpkg_configure_cmake/vcpkg_configure_cmake(\n        OPTIONS -DAOM_TEST_NASM=OFF -DAOM_TEST_PIC=OFF/g' "$AOM_PORTFILE" 
+            cat >> "$AOM_PORTFILE" << 'EOF'
+          if(VCPKG_TARGET_IS_OSX AND VCPKG_TARGET_ARCHITECTURE STREQUAL "x64")
+            list(APPEND OPTIONS -DAOM_TEST_NASM=OFF -DAOM_TEST_PIC=OFF -DAOM_ENABLE_TESTS=OFF)
+          endif()
+          EOF
+          echo "✅ Patch applied"
+          else
+          echo "⚠️  aom portfile not found, trying alternative method..."
+          mkdir -p "${GITHUB_WORKSPACE}/vcpkg-overlay/ports/aom"
+          cp -r "${VCPKG_ROOT}/ports/aom"/* "${GITHUB_WORKSPACE}/vcpkg-overlay/ports/aom/" 2>/dev/null || true
+          echo "list(APPEND OPTIONS -DAOM_TEST_NASM=OFF -DAOM_TEST_PIC=OFF)" >> "${GITHUB_WORKSPACE}/vcpkg-overlay/ports/aom/portfile.cmake"
+          fi
 
+      - name: Setup vcpkg with Github Actions binary cache
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+          doNotCache: false
+          vcpkgOverlayPorts: "${{ github.workspace }}/vcpkg-overlay/ports"
+      
+      - name: Clean vcpkg cache for aom (macOS Intel)
+        if: ${{ matrix.job.arch == 'x86_64' }}
+        run: |
+          rm -rf "${VCPKG_ROOT}/buildtrees/aom"
+          rm -rf "${VCPKG_ROOT}/packages/aom*"
+          rm -rf "${VCPKG_ROOT}/downloads/aom*"
+          echo "✅ Cleaned aom cache"
+      
       - name: Install vcpkg dependencies
         run: |
           if ! $VCPKG_ROOT/vcpkg \
@@ -521,6 +537,14 @@ jobs:
             exit 1
           fi
           head -n 100 "${VCPKG_ROOT}/buildtrees/ffmpeg/build-${{ matrix.job.vcpkg-triplet }}-rel-out.log" || true
+
+      - name: Upload libaom debug logs (macOS Intel)
+        if: ${{ failure() && matrix.job.arch == 'x86_64' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: libaom-debug-logs-x64
+          path: |
+            ${{ env.VCPKG_ROOT }}/buildtrees/aom/config-x64-osx-*.log
 
       - name: Report Status
         uses: fjogeleit/http-request-action@v1
