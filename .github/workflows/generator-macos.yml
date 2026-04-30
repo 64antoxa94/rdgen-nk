@@ -481,12 +481,6 @@ jobs:
           name: bridge-artifact
           path: ./
 
-      - name: Setup vcpkg with Github Actions binary cache
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
-          doNotCache: false
-
       - name: Patch libaom portfile for macOS Intel
         if: ${{ matrix.job.arch == 'x86_64' }}
         run: | 
